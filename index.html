@@ -346,6 +346,7 @@
     <span id="rank">🏅 见习侦探</span>
     <span id="caseTitle">月夜古堡失窃案</span>
     <span id="clueCount">🔑 线索 0</span>
+    <span id="muteBtn" onclick="toggleMute()" style="cursor:pointer;font-size:1.1rem;user-select:none;">🔊</span>
   </div>
   <div id="sceneWrapper">
     <canvas id="sceneCanvas"></canvas>
@@ -830,6 +831,8 @@ function onHotspotClick(data) {
 
   obj.clueFound = true;
   foundClues++;
+  playClick();
+  setTimeout(() => playClue(), 200);
 
   document.getElementById('clueCount').textContent = `🔑 线索 ${foundClues}`;
 
@@ -847,6 +850,7 @@ function showModal(title, text, isEnd = false) {
   const btn = document.getElementById('modalClose');
   btn.textContent = isEnd ? '🎉 结案！' : '继续调查';
   btn.onclick = () => {
+    playClick();
     document.getElementById('modal').classList.remove('active');
     if (isEnd) {
       showEnding();
@@ -872,6 +876,7 @@ function checkProgress() {
 let currentScene = 0;
 
 function goToScene(index) {
+  playSceneChange();
   currentScene = index;
   const scene = CASE.scenes[index];
 
@@ -891,6 +896,8 @@ function goToScene(index) {
 //  结案画面
 // ═══════════════════════════════════════════════
 function showEnding() {
+  playVictory();
+  stopBgMusic();
   document.getElementById('game').style.display = 'none';
   const end = document.getElementById('endScreen');
   end.classList.add('active');
@@ -968,9 +975,113 @@ function drawEndCanvas() {
 }
 
 // ═══════════════════════════════════════════════
+//  🎵 音效系统（Web Audio API）
+// ═══════════════════════════════════════════════
+let audioCtx = null;
+let bgMusicNode = null;
+let muted = false;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+// 生成音符
+function playTone(freq, duration, type = 'sine', volume = 0.15, delay = 0) {
+  if (!audioCtx || muted) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = type;
+  osc.frequency.value = freq;
+  const t = audioCtx.currentTime + delay;
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  osc.start(t);
+  osc.stop(t + duration + 0.05);
+}
+
+// 点击音效
+function playClick() {
+  if (!audioCtx || muted) return;
+  playTone(800, 0.05, 'square', 0.08);
+  playTone(1200, 0.05, 'square', 0.05, 0.03);
+}
+
+// 发现线索音效
+function playClue() {
+  if (!audioCtx || muted) return;
+  [523, 659, 784, 1047].forEach((f, i) => playTone(f, 0.25, 'sine', 0.12, i * 0.12));
+}
+
+// 场景切换音效
+function playSceneChange() {
+  if (!audioCtx || muted) return;
+  playTone(300, 0.08, 'sine', 0.1);
+  playTone(450, 0.08, 'sine', 0.08, 0.06);
+}
+
+// 结案胜利音效
+function playVictory() {
+  if (!audioCtx || muted) return;
+  const melody = [523, 659, 784, 1047, 784, 1047, 1319];
+  const times = [0, 0.15, 0.3, 0.45, 0.65, 0.8, 0.95];
+  melody.forEach((f, i) => playTone(f, 0.3, 'sine', 0.15, times[i]));
+  // 和声
+  playTone(1319, 1.5, 'triangle', 0.06, 0.8);
+}
+
+// 背景音乐（神秘ambient pad）
+function startBgMusic() {
+  if (!audioCtx || muted || bgMusicNode) return;
+  const freqs = [130, 195, 260, 325];
+  bgMusicNode = freqs.map(f => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    gain.gain.value = 0.04;
+    osc.start();
+    // LFO 颤动
+    const lfo = audioCtx.createOscillator();
+    const lfoGain = audioCtx.createGain();
+    lfo.frequency.value = 0.2 + Math.random() * 0.3;
+    lfoGain.gain.value = 3;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    lfo.start();
+    return { osc, gain, lfo };
+  });
+}
+
+function stopBgMusic() {
+  if (!bgMusicNode) return;
+  bgMusicNode.forEach(n => {
+    n.gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+    setTimeout(() => { try { n.osc.stop(); n.lfo.stop(); } catch(e) {} }, 600);
+  });
+  bgMusicNode = null;
+}
+
+// 静音切换
+function toggleMute() {
+  muted = !muted;
+  const btn = document.getElementById('muteBtn');
+  if (btn) btn.textContent = muted ? '🔇' : '🔊';
+  if (muted) stopBgMusic();
+  else if (document.getElementById('game').style.display === 'flex') startBgMusic();
+}
+
+// ═══════════════════════════════════════════════
 //  启动
 // ═══════════════════════════════════════════════
 document.getElementById('startBtn').addEventListener('click', () => {
+  initAudio();
+  playSceneChange();
+  startBgMusic();
   document.getElementById('loading').classList.add('active');
   document.getElementById('loadingText').textContent = '正在生成第一关...';
 
