@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <title>🕵️ 影子侦探社</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d0d1a;
+      color: #e8e0ff;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    /* ── 封面 ── */
+    #cover {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+      background: radial-gradient(ellipse at 50% 30%, #1a1040 0%, #0d0d1a 70%);
+    }
+
+    #cover h1 {
+      font-size: 2.6rem;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 0 30px #7c3aed, 0 0 60px #7c3aed55;
+      margin-bottom: 8px;
+      letter-spacing: 4px;
+    }
+
+    #cover .subtitle {
+      color: #a78bfa;
+      font-size: 1.1rem;
+      margin-bottom: 40px;
+    }
+
+    .cover-art {
+      width: min(85vw, 400px);
+      aspect-ratio: 16/9;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #1e1040, #2d1b69);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 4rem;
+      margin-bottom: 36px;
+      box-shadow: 0 0 40px #7c3aed44, 0 20px 60px #00000088;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .cover-art canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .cover-art .art-placeholder {
+      position: relative;
+      z-index: 1;
+      font-size: 5rem;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    #startBtn {
+      background: linear-gradient(135deg, #7c3aed, #5b21b6);
+      color: white;
+      border: none;
+      padding: 18px 60px;
+      font-size: 1.3rem;
+      font-weight: 700;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 0 30px #7c3aed88, 0 8px 24px #00000066;
+      transition: transform 0.2s, box-shadow 0.2s;
+      letter-spacing: 2px;
+    }
+
+    #startBtn:active { transform: scale(0.96); }
+
+    /* ── 游戏场景 ── */
+    #game {
+      display: none;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* 顶部状态栏 */
+    #topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #13132a;
+      border-bottom: 1px solid #2d2b55;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    #rank {
+      font-size: 0.8rem;
+      color: #a78bfa;
+      font-weight: 600;
+    }
+
+    #caseTitle {
+      font-size: 0.9rem;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    #clueCount {
+      font-size: 0.8rem;
+      color: #fbbf24;
+    }
+
+    /* 场景图区域 */
+    #sceneWrapper {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #0a0a18;
+    }
+
+    #sceneCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 热点指示器 */
+    .hotspot-hint {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid rgba(167, 139, 250, 0.7);
+      animation: pulse-ring 1.5s ease-out infinite;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .hotspot-hint::after {
+      content: '?';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 900;
+      color: #a78bfa;
+    }
+
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(167,139,250,0.5); opacity: 1; }
+      100% { box-shadow: 0 0 0 18px rgba(167,139,250,0); opacity: 0; }
+    }
+
+    /* 场景文字 */
+    #sceneText {
+      padding: 16px;
+      background: #13132a;
+      border-top: 1px solid #2d2b55;
+      font-size: 1rem;
+      line-height: 1.7;
+      min-height: 120px;
+    }
+
+    #sceneText .scene-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #a78bfa;
+      margin-bottom: 8px;
+    }
+
+    /* 加载状态 */
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: #0d0d1aee;
+      z-index: 100;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #loading.active { display: flex; }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #2d2b55;
+      border-top-color: #7c3aed;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #loading p { color: #a78bfa; font-size: 1rem; }
+
+    /* 弹窗 */
+    #modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0d0d1aee;
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    #modal.active { display: flex; }
+
+    .modal-box {
+      background: #1a1a35;
+      border: 1px solid #3b3999;
+      border-radius: 24px;
+      padding: 28px 24px;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 0 60px #7c3aed33;
+    }
+
+    .modal-box h2 {
+      font-size: 1.4rem;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+
+    .modal-box p {
+      color: #c4b5fd;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .modal-btn {
+      background: linear-gradient(135deg, #7c3aed, #5b21b6);
+      color: white;
+      border: none;
+      padding: 14px 36px;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .modal-btn:active { transform: scale(0.95); }
+
+    /* 结案画面 */
+    #endScreen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+      background: radial-gradient(ellipse at 50% 30%, #1a1040 0%, #0d0d1a 70%);
+    }
+
+    #endScreen.active { display: flex; }
+
+    #endScreen h2 {
+      font-size: 2rem;
+      color: #fff;
+      margin: 20px 0 8px;
+      text-shadow: 0 0 20px #7c3aed;
+    }
+
+    #endScreen .end-rank {
+      font-size: 1.2rem;
+      color: #fbbf24;
+      margin-bottom: 16px;
+    }
+
+    #endCanvas {
+      width: min(85vw, 400px);
+      aspect-ratio: 16/9;
+      border-radius: 16px;
+      margin: 16px 0;
+      box-shadow: 0 0 40px #7c3aed44;
+    }
+
+    #endScreen p {
+      color: #c4b5fd;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      max-width: 320px;
+    }
+
+    #replayBtn {
+      margin-top: 24px;
+      background: linear-gradient(135deg, #7c3aed, #5b21b6);
+      color: white;
+      border: none;
+      padding: 16px 48px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 50px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<!-- 封面 -->
+<div id="cover">
+  <h1>🕵️ 影子侦探社</h1>
+  <p class="subtitle">AI 实时生成 · 图像冒险游戏</p>
+  <div class="cover-art" id="coverArt">
+    <span class="art-placeholder">🔍</span>
+  </div>
+  <button id="startBtn">开始破案</button>
+</div>
+
+<!-- 游戏主界面 -->
+<div id="game">
+  <div id="topbar">
+    <span id="rank">🏅 见习侦探</span>
+    <span id="caseTitle">月夜古堡失窃案</span>
+    <span id="clueCount">🔑 线索 0</span>
+  </div>
+  <div id="sceneWrapper">
+    <canvas id="sceneCanvas"></canvas>
+    <!-- 热点动态生成 -->
+  </div>
+  <div id="sceneText">
+    <div class="scene-title" id="sceneTitle">加载中...</div>
+    <div id="sceneDesc">正在生成场景...</div>
+  </div>
+</div>
+
+<!-- 加载中 -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p id="loadingText">AI 正在生成画面...</p>
+</div>
+
+<!-- 弹窗（线索/对话） -->
+<div id="modal">
+  <div class="modal-box">
+    <h2 id="modalTitle">发现线索！</h2>
+    <p id="modalText">线索内容</p>
+    <button class="modal-btn" id="modalClose">继续调查</button>
+  </div>
+</div>
+
+<!-- 结案画面 -->
+<div id="endScreen">
+  <h2>🎉 案件侦破！</h2>
+  <div class="end-rank" id="endRank">🏆 见习侦探</div>
+  <canvas id="endCanvas"></canvas>
+  <p id="endText">你成功揭开了真相！</p>
+  <button id="replayBtn" onclick="location.reload()">🔄 再玩一次</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  案件数据
+// ═══════════════════════════════════════════════
+const CASE = {
+  scenes: [
+    {
+      id: 0,
+      title: "🌙 深夜电话",
+      desc: "凌晨2点，你被急促的电话铃声惊醒——\n\n「影子侦探社吗？大事不好！魔法校长的星光宝石被偷了！」\n\n你立刻跳下床，抓起侦探包冲进夜色中...",
+      sceneColor: "#0f0a2e",
+      objects: [
+        { x: 0.15, y: 0.38, w: 0.18, h: 0.3, label: "📱 电话", hint: "门卫爷爷打来的", type: "clue", value: "门卫爷爷的紧急电话" },
+        { x: 0.75, y: 0.55, w: 0.22, h: 0.22, label: "🎒 侦探包", hint: "准备出发", type: "info", value: "装备齐全！出发！" },
+      ]
+    },
+    {
+      id: 1,
+      title: "🔍 展览室现场",
+      desc: "你来到展览室——警戒线围住空空的展柜。\n\n地上有一支发光的蓝色羽毛笔，窗台上有串泥脚印...\n\n仔细观察，你发现了三个值得注意的东西。",
+      sceneColor: "#1a0a10",
+      objects: [
+        { x: 0.25, y: 0.42, w: 0.15, h: 0.28, label: "🪶 羽毛笔", hint: "上面有字？", type: "clue", value: "蓝色羽毛笔 — 来自美术教室，笔尖有星光宝石碎屑" },
+        { x: 0.62, y: 0.58, w: 0.18, h: 0.22, label: "👣 泥脚印", hint: "很小的脚印...", type: "clue", value: "神秘脚印 — 来自星光池塘，儿童鞋码" },
+        { x: 0.82, y: 0.3, w: 0.15, h: 0.3, label: "🔐 展柜锁", hint: "没被撬的痕迹", type: "clue", value: "展柜锁 — 没有撬痕，嫌疑人有钥匙" },
+      ]
+    },
+    {
+      id: 2,
+      title: "🎨 波波老师的秘密",
+      desc: "你来到美术教室，波波老师正在整理画材。\n\n她看到那支蓝色羽毛笔，表情变得复杂...\n\n「那是我借给小浩的，他想画一幅校庆画送给校长。」\n\n小浩，又是小浩？",
+      sceneColor: "#1a1020",
+      objects: [
+        { x: 0.3, y: 0.5, w: 0.2, h: 0.2, label: "🎨 波波老师", hint: "她知道些什么", type: "info", value: "波波老师把笔借给了小浩" },
+        { x: 0.65, y: 0.45, w: 0.18, h: 0.28, label: "🪶 蓝色羽毛笔", hint: "魔法墨水做的", type: "clue", value: "美术教室的羽毛笔，用魔法墨水" },
+      ]
+    },
+    {
+      id: 3,
+      title: "🌌 星光池塘",
+      desc: "你来到后花园的星光池塘——月光洒在水面上，美得像梦一样。\n\n你用手电筒往水里照——\n\n等等！水底有个发光的东西！你伸手下去，摸到了一个天鹅绒小袋子...\n\n里面正是星光宝石！",
+      sceneColor: "#0a1a2e",
+      objects: [
+        { x: 0.5, y: 0.5, w: 0.3, h: 0.35, label: "💎 宝石！", hint: "在池塘底", type: "clue", value: "星光宝石 — 一直在池塘底，没有被偷走！" },
+        { x: 0.2, y: 0.7, w: 0.15, h: 0.15, label: "🌙 月光", hint: "照耀池塘", type: "info", value: "月光下的池塘美极了" },
+      ]
+    },
+    {
+      id: 4,
+      title: "🔍 真相大白",
+      desc: "你带着宝石来到门卫室。\n\n门卫爷爷笑着听完你的推理，叹了口气：\n\n「是的，宝石是我藏到池塘的——因为有人要在校庆栽赃给一个好学生，我提前保护了它。」\n\n这时窗外传来欢呼——真正的窃贼被抓住了！",
+      sceneColor: "#1a1020",
+      objects: [
+        { x: 0.5, y: 0.5, w: 0.25, h: 0.3, label: "🚪 窗外的欢呼", hint: "抓到真凶了！", type: "info", value: "真正的窃贼被抓到了！" },
+      ]
+    }
+  ],
+  cluesNeeded: 3,
+  finalSceneIndex: 4
+};
+
+// ═══════════════════════════════════════════════
+//  渲染：Canvas 场景绘制
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('sceneCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const wrapper = document.getElementById('sceneWrapper');
+  canvas.width = wrapper.clientWidth;
+  canvas.height = wrapper.clientHeight;
+}
+
+function drawScene(sceneIndex) {
+  resizeCanvas();
+  const scene = CASE.scenes[sceneIndex];
+  const w = canvas.width, h = canvas.height;
+
+  // 背景渐变
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, scene.sceneColor);
+  grad.addColorStop(1, '#050510');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 场景装饰元素
+  const cx = w * 0.5, cy = h * 0.42;
+
+  // 大月亮
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(w * 0.78, h * 0.18, Math.min(w, h) * 0.12, 0, Math.PI * 2);
+  const moonGrad = ctx.createRadialGradient(w * 0.78, h * 0.18, 0, w * 0.78, h * 0.18, Math.min(w, h) * 0.12);
+  moonGrad.addColorStop(0, '#fffde7');
+  moonGrad.addColorStop(1, '#ffd54f');
+  ctx.fillStyle = moonGrad;
+  ctx.shadowColor = '#ffd54f';
+  ctx.shadowBlur = 40;
+  ctx.fill();
+  ctx.restore();
+
+  // 星星
+  const stars = [
+    [0.1, 0.15], [0.25, 0.08], [0.4, 0.2], [0.6, 0.1], [0.88, 0.22],
+    [0.15, 0.55], [0.82, 0.6], [0.35, 0.7], [0.7, 0.75]
+  ];
+  stars.forEach(([sx, sy]) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(w * sx, h * sy, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // 场景主体（随场景变化）
+  drawSceneArt(sceneIndex, cx, cy, w, h);
+
+  // 热点
+  renderHotspots(sceneIndex, w, h);
+}
+
+function drawSceneArt(index, cx, cy, w, h) {
+  const s = Math.min(w, h);
+
+  ctx.save();
+  ctx.shadowBlur = 30;
+  ctx.shadowColor = '#7c3aed';
+  ctx.shadowOffsetY = 10;
+
+  if (index === 0) {
+    // 城堡
+    drawCastle(cx, cy, s);
+  } else if (index === 1) {
+    // 展览室
+    drawMuseum(cx, cy, s);
+  } else if (index === 2) {
+    // 美术教室
+    drawArtRoom(cx, cy, s);
+  } else if (index === 3) {
+    // 池塘
+    drawPond(cx, cy, s, w, h);
+  } else {
+    // 门卫室
+    drawGuardRoom(cx, cy, s);
+  }
+
+  ctx.restore();
+}
+
+function drawCastle(cx, cy, s) {
+  const bW = s * 0.7, bH = s * 0.55;
+  const bx = cx - bW / 2, by = cy - bH / 2;
+
+  // 城堡主体
+  ctx.fillStyle = '#1a1040';
+  ctx.fillRect(bx + bW * 0.1, by + bH * 0.3, bW * 0.8, bH * 0.7);
+
+  // 塔楼
+  [[bx, by], [bx + bW * 0.35, by - bH * 0.1], [bx + bW * 0.65, by - bH * 0.1], [bx + bW * 0.8, by + bH * 0.1]].forEach(([tx, ty], i) => {
+    const tW = bW * (i === 1 ? 0.25 : 0.15);
+    const tH = bH * (i === 1 ? 0.4 : 0.3);
+    ctx.fillStyle = '#251650';
+    ctx.fillRect(tx, ty, tW, tH);
+    // 窗户发光
+    ctx.save();
+    ctx.shadowColor = '#fbbf24';
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(tx + tW * 0.35, ty + tH * 0.3, tW * 0.3, tH * 0.25);
+    ctx.restore();
+  });
+
+  // 魔法窗户
+  const windows = [[cx - bW * 0.15, cy - bH * 0.1], [cx + bW * 0.1, cy - bH * 0.1], [cx, cy + bH * 0.15]];
+  windows.forEach(([wx, wy]) => {
+    ctx.save();
+    ctx.shadowColor = '#a78bfa';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#a78bfa';
+    ctx.fillRect(wx - 8, wy - 10, 16, 20);
+    ctx.restore();
+  });
+}
+
+function drawMuseum(cx, cy, s) {
+  // 展柜
+  const bW = s * 0.5, bH = s * 0.4;
+  const bx = cx - bW / 2, by = cy - bH / 2;
+
+  // 地面
+  ctx.fillStyle = '#1a0a10';
+  ctx.fillRect(0, cy + bH * 0.3, canvas.width, canvas.height);
+
+  // 警戒线
+  ctx.save();
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 8]);
+  ctx.shadowColor = '#ef4444';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(bx - 20, by + bH * 0.1);
+  ctx.lineTo(bx + bW + 20, by + bH * 0.1);
+  ctx.stroke();
+  ctx.restore();
+
+  // 空展柜
+  ctx.save();
+  ctx.shadowColor = '#60a5fa';
+  ctx.shadowBlur = 20;
+  ctx.strokeStyle = '#60a5fa';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(bx, by, bW, bH);
+  ctx.restore();
+
+  // 羽毛笔（地上）
+  ctx.save();
+  ctx.shadowColor = '#3b82f6';
+  ctx.shadowBlur = 15;
+  ctx.fillStyle = '#3b82f6';
+  ctx.beginPath();
+  ctx.ellipse(bx - 30, by + bH + 10, 25, 5, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  // 羽毛
+  ctx.save();
+  ctx.translate(bx - 30, by + bH);
+  ctx.rotate(-0.5);
+  ctx.beginPath();
+  ctx.ellipse(0, -20, 6, 25, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#60a5fa';
+  ctx.shadowColor = '#60a5fa';
+  ctx.shadowBlur = 15;
+  ctx.fill();
+  ctx.restore();
+  ctx.restore();
+
+  // 脚印
+  [[cx + bW * 0.4, by + bH + 20], [cx + bW * 0.55, by + bH + 10]].forEach(([fx, fy]) => {
+    ctx.save();
+    ctx.fillStyle = '#8b5a2b';
+    ctx.shadowColor = '#8b5a2b';
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, 10, 6, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawArtRoom(cx, cy, s) {
+  // 画架
+  const bW = s * 0.45, bH = s * 0.5;
+  const bx = cx - bW / 2, by = cy - bH / 2;
+
+  ctx.save();
+  ctx.strokeStyle = '#92400e';
+  ctx.lineWidth = 6;
+  // 画架腿
+  ctx.beginPath();
+  ctx.moveTo(bx + 10, by + bH);
+  ctx.lineTo(cx, by + 10);
+  ctx.lineTo(bx + bW - 10, by + bH);
+  ctx.stroke();
+  // 画布
+  ctx.fillStyle = '#fef3c7';
+  ctx.shadowColor = '#fbbf24';
+  ctx.shadowBlur = 15;
+  ctx.fillRect(bx + bW * 0.2, by + bH * 0.1, bW * 0.6, bH * 0.55);
+  // 画架上的画（未完成的画）
+  ctx.fillStyle = '#60a5fa';
+  ctx.beginPath();
+  ctx.arc(bx + bW * 0.5, by + bH * 0.35, bW * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#22c55e';
+  ctx.fillRect(bx + bW * 0.35, by + bH * 0.45, bW * 0.3, bH * 0.15);
+  ctx.restore();
+
+  // 蓝色羽毛笔
+  ctx.save();
+  ctx.shadowColor = '#818cf8';
+  ctx.shadowBlur = 15;
+  ctx.fillStyle = '#818cf8';
+  ctx.translate(cx + bW * 0.5, cy + bH * 0.6);
+  ctx.rotate(0.4);
+  ctx.beginPath();
+  ctx.ellipse(0, -18, 5, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 美术老师剪影（简化）
+  ctx.save();
+  ctx.fillStyle = '#6d28d9';
+  ctx.beginPath();
+  ctx.arc(cx - bW * 0.4, cy + bH * 0.2, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(cx - bW * 0.42, cy + bH * 0.2, 20, 30);
+  ctx.restore();
+}
+
+function drawPond(cx, cy, s, w, h) {
+  // 水面
+  const pW = w * 0.7, pH = h * 0.35;
+  const px = cx - pW / 2, py = cy;
+
+  const waterGrad = ctx.createRadialGradient(cx, py + pH * 0.5, 0, cx, py + pH * 0.5, pW * 0.6);
+  waterGrad.addColorStop(0, '#1e3a5f');
+  waterGrad.addColorStop(1, '#0c1929');
+  ctx.save();
+  ctx.fillStyle = waterGrad;
+  ctx.beginPath();
+  ctx.ellipse(cx, py + pH * 0.5, pW * 0.5, pH * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 月亮倒影
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.beginPath();
+  ctx.ellipse(cx + w * 0.1, py + pH * 0.4, 15, 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#fffde7';
+  ctx.fill();
+  ctx.restore();
+
+  // 水面波光
+  for (let i = 0; i < 6; i++) {
+    ctx.save();
+    ctx.globalAlpha = 0.15 + Math.random() * 0.1;
+    ctx.strokeStyle = '#60a5fa';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const ox = cx - pW * 0.3 + i * pW * 0.12;
+    ctx.moveTo(ox, py + pH * 0.2);
+    ctx.quadraticCurveTo(ox + 15, py + pH * 0.35, ox, py + pH * 0.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 宝石在水底（发光）
+  ctx.save();
+  ctx.shadowColor = '#fbbf24';
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = '#fbbf24';
+  ctx.beginPath();
+  ctx.moveTo(cx, py + pH * 0.3);
+  ctx.lineTo(cx - 12, py + pH * 0.5);
+  ctx.lineTo(cx, py + pH * 0.7);
+  ctx.lineTo(cx + 12, py + pH * 0.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // 城堡倒影
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = '#1a1040';
+  ctx.fillRect(cx - s * 0.2, py - s * 0.15, s * 0.4, s * 0.3);
+  ctx.restore();
+}
+
+function drawGuardRoom(cx, cy, s) {
+  // 房间
+  ctx.fillStyle = '#1a1028';
+  ctx.fillRect(cx - s * 0.4, cy - s * 0.35, s * 0.8, s * 0.65);
+
+  // 桌子
+  ctx.save();
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(cx - s * 0.3, cy + s * 0.05, s * 0.6, s * 0.08);
+  ctx.restore();
+
+  // 宝石在桌上
+  ctx.save();
+  ctx.shadowColor = '#fbbf24';
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = '#fbbf24';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - s * 0.05);
+  ctx.lineTo(cx - 10, cy + s * 0.05);
+  ctx.lineTo(cx, cy + s * 0.18);
+  ctx.lineTo(cx + 10, cy + s * 0.05);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // 窗外火光
+  ctx.save();
+  ctx.shadowColor = '#f97316';
+  ctx.shadowBlur = 40;
+  ctx.fillStyle = '#f97316';
+  ctx.beginPath();
+  ctx.arc(cx + s * 0.2, cy - s * 0.15, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 门卫剪影
+  ctx.save();
+  ctx.fillStyle = '#6d28d9';
+  ctx.beginPath();
+  ctx.arc(cx - s * 0.3, cy - s * 0.05, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(cx - s * 0.33, cy + s * 0.02, 18, 25);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+//  热点系统
+// ═══════════════════════════════════════════════
+let currentHotspots = [];
+let foundClues = 0;
+let gameState = 'playing'; // 'playing' | 'won'
+
+function renderHotspots(sceneIndex, w, h) {
+  const wrapper = document.getElementById('sceneWrapper');
+  // 清除旧热点
+  wrapper.querySelectorAll('.hotspot-hint').forEach(el => el.remove());
+  currentHotspots = [];
+
+  const scene = CASE.scenes[sceneIndex];
+  scene.objects.forEach((obj, i) => {
+    const isFound = obj.clueFound;
+    if (isFound) return; // 已找到的不显示热点
+
+    const hint = document.createElement('div');
+    hint.className = 'hotspot-hint';
+    hint.style.left = `${obj.x * 100}%`;
+    hint.style.top = `${obj.y * 100}%`;
+    hint.title = obj.label;
+
+    const objData = { el: hint, obj, index: i };
+    currentHotspots.push(objData);
+    wrapper.appendChild(hint);
+
+    hint.addEventListener('click', () => onHotspotClick(objData));
+    hint.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      onHotspotClick(objData);
+    });
+  });
+}
+
+function onHotspotClick(data) {
+  const { obj } = data;
+  if (obj.clueFound) return;
+
+  obj.clueFound = true;
+  foundClues++;
+
+  document.getElementById('clueCount').textContent = `🔑 线索 ${foundClues}`;
+
+  showModal(obj.label, obj.value);
+
+  // 标记热点为已找
+  data.el.style.display = 'none';
+}
+
+function showModal(title, text, isEnd = false) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalText').textContent = text;
+  document.getElementById('modal').classList.add('active');
+
+  const btn = document.getElementById('modalClose');
+  btn.textContent = isEnd ? '🎉 结案！' : '继续调查';
+  btn.onclick = () => {
+    document.getElementById('modal').classList.remove('active');
+    if (isEnd) {
+      showEnding();
+    } else {
+      // 检查是否集齐线索
+      checkProgress();
+    }
+  };
+}
+
+function checkProgress() {
+  if (foundClues >= CASE.cluesNeeded) {
+    // 解锁最终场景
+    setTimeout(() => {
+      goToScene(CASE.finalSceneIndex);
+    }, 500);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  场景切换
+// ═══════════════════════════════════════════════
+let currentScene = 0;
+
+function goToScene(index) {
+  currentScene = index;
+  const scene = CASE.scenes[index];
+
+  document.getElementById('sceneTitle').textContent = scene.title;
+  document.getElementById('sceneDesc').textContent = scene.desc;
+
+  drawScene(index);
+
+  // 更新状态
+  if (index === CASE.finalSceneIndex) {
+    gameState = 'won';
+    showModal('🔍 真相大白！', '你已经收集了足够的线索，可以揭露案件真相了！', true);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  结案画面
+// ═══════════════════════════════════════════════
+function showEnding() {
+  document.getElementById('game').style.display = 'none';
+  const end = document.getElementById('endScreen');
+  end.classList.add('active');
+  document.getElementById('endRank').textContent = '🏆 影子侦探（实习）';
+  document.getElementById('endText').textContent =
+    `你成功侦破了「月夜古堡失窃案」！\n\n门卫爷爷是清白的——他保护了宝石免遭栽赃。\n\n你展现了出色的观察力和逻辑推理能力！`;
+
+  // 绘制结案画面
+  drawEndCanvas();
+}
+
+function drawEndCanvas() {
+  const c = document.getElementById('endCanvas');
+  const w = c.width = c.clientWidth * 2;
+  const h = c.height = c.clientHeight * 2;
+  const ctx = c.getContext('2d');
+
+  // 背景
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#1a1040');
+  grad.addColorStop(1, '#0d0d1a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 星星
+  for (let i = 0; i < 30; i++) {
+    ctx.save();
+    ctx.fillStyle = `rgba(255,255,255,${0.3 + Math.random() * 0.5})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 徽章
+  const cx = w / 2, cy = h * 0.38;
+  ctx.save();
+  ctx.shadowColor = '#fbbf24';
+  ctx.shadowBlur = 50;
+  const badgeGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 70);
+  badgeGrad.addColorStop(0, '#fef3c7');
+  badgeGrad.addColorStop(0.5, '#fbbf24');
+  badgeGrad.addColorStop(1, '#b45309');
+  ctx.fillStyle = badgeGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 65, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 徽章文字
+  ctx.save();
+  ctx.fillStyle = '#78350f';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('影子侦探', cx, cy - 12);
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillText('SHADOW DETECTIVE', cx, cy + 12);
+  ctx.restore();
+
+  // 烟花
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const ex = cx + Math.cos(angle) * 90;
+    const ey = cy + Math.sin(angle) * 90;
+    ctx.save();
+    ctx.shadowColor = ['#ef4444', '#f97316', '#fbbf24', '#a78bfa', '#60a5fa'][i % 5];
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = ctx.shadowColor;
+    ctx.beginPath();
+    ctx.arc(ex, ey, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  启动
+// ═══════════════════════════════════════════════
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('loading').classList.add('active');
+  document.getElementById('loadingText').textContent = '正在生成第一关...';
+
+  setTimeout(() => {
+    document.getElementById('loading').classList.remove('active');
+    document.getElementById('cover').style.display = 'none';
+    document.getElementById('game').style.display = 'flex';
+    goToScene(0);
+  }, 1200);
+});
+
+// 预加载字体
+document.fonts.ready.then(() => {
+  // nothing needed
+});
+</script>
+</body>
+</html>
